@@ -45,13 +45,13 @@ object Tests extends App {
   //val loader = new Loader(dbFile)
   //loader.close
 
-  val xtl = new XTL(dbFile)
+  val xtl = new XTL(dbFile, nThread = 1)
   val start = System.currentTimeMillis()
   xtl.xtl
   val duration = System.currentTimeMillis() - start
   println("xtl took "+ duration +" ms.")
-  //xtl.close
+  xtl.close
 
-  xtl.run
+  //xtl.run
 
 }

@@ -14,58 +14,71 @@ class Loader (private val dbFile: File) {
 
   try
   {
-    Class.forName("org.sqlite.JDBC");
+    Class.forName("org.sqlite.JDBC")
   } catch {
     case cnfe : ClassNotFoundException => throw new SQLException(cnfe);
   }
 
-  val url = "jdbc:sqlite:"+dbFile.getAbsolutePath();
-  private val connection  = DriverManager.getConnection(url);
-  connection.setAutoCommit(false);
-  private val symbols = XTL.getSymbols()
+  val url = "jdbc:sqlite:"+dbFile.getAbsolutePath()
+  private val connection  = DriverManager.getConnection(url)
+  connection.setAutoCommit(false)
 
-  init
-  var isClosed = false
+  private val symbols : List[Symbol] = XTL.getSymbols()
+  private val instruments : Set[String] = symbols.map(_.instrument).toSet
+  private val rows = init
+  private val idMap : Map[String, Int] = rows.map(row => (row.symbol.instrument -> row.id)).toMap
 
-  private def init {
-    val rs  = executeQuery(Loader.TABLE_NAMES_SELECT_STMT);
+  @volatile var isClosed = false
+
+  private def init : List[MetaDataRow] =  {
+    val rs  = executeQuery(Loader.TABLE_NAMES_SELECT_STMT)
 
     val presentTables  = new collection.mutable.ListBuffer[String]()
     while (rs.next())
-      presentTables += rs.getString("name");
+      presentTables += rs.getString("name")
 
     if (! presentTables.contains("instruments"))
       executeUpdate(Loader.CREATE_METADATA_TABLE_STMT)
+    if (! presentTables.contains("ticks"))
+      executeUpdate(Loader.CREATE_TICKS_TABLE_STMT)
 
+    val presentMetadataRows = new collection.mutable.ListBuffer[MetaDataRow]()
 
-    val rss = executeQuery("select * from instruments;")
-
-    val presentMetadataRows  = new collection.mutable.ListBuffer[String]()
+    val rss = executeQuery("select * from instruments")
     while (rss.next())
-      presentMetadataRows += rss.getString("tableName")
+    {
+      val id = rss.getInt("id")
+      val instrument = rss.getString("instrument")
+      val description = rss.getString("description")
+      presentMetadataRows += MetaDataRow(id, Symbol(instrument, description))
+    }
 
+    val presentSymbols: List[Symbol] = presentMetadataRows.map(row => row.symbol).toList
+    val presentInstruments = presentSymbols.map(_.instrument)
 
     for (symbol <-  symbols)
-    {
-      //println("symbol " + symbol)
-      val tableName = Loader.getTableName(symbol.instrument)
-      if (! presentMetadataRows.contains(tableName))
+      if (! presentInstruments.contains(symbol.instrument))
       {
         println("updating symbol "+ symbol +" in instruments")
-        val insert = "insert into instruments (tableName, instrument, description) VALUES ('"+ tableName + "', '"+ symbol.instrument+"', '"+ symbol.description+"');"
+        val insert = "insert into instruments (instrument, description) VALUES ('"+ symbol.instrument+"', '"+ symbol.description+"');"
         executeUpdate(insert)
+      }
 
-      }
-      if (! presentTables.contains(tableName)) {
-        println("creating table "+ tableName)
-        executeUpdate(Loader.createInstrumentTableStatement(symbol.instrument))
-      }
+    presentMetadataRows.clear
+    val rsss = executeQuery("select * from instruments");
+    while (rsss.next())
+    {
+      val id = rsss.getInt("id");
+      val instrument = rsss.getString("instrument")
+      val description = rsss.getString("description")
+      presentMetadataRows += MetaDataRow(id, Symbol(instrument, description))
     }
+    presentMetadataRows.toList
   }
 
   private def executeUpdate(update : String, commit :Boolean = true) {
     if (isClosed)
-      throw new IllegalStateException(this+" is closed")
+      throw new IllegalStateException(this + " is closed")
 
     val stmt : Statement = connection.createStatement()
     stmt.executeUpdate(update)
@@ -74,40 +87,47 @@ class Loader (private val dbFile: File) {
       connection.commit()
   }
 
-  def updateValues(candlesticks : Seq[CandleStick]) = {
-    val instruments = symbols.map(_.instrument)
+  def updateValues(candlesticks : List[CandleStick]) = {
 
-    val updatedInstruments : Seq[String] = {
-      if (isClosed)
-        throw new IllegalStateException(this + " is closed")
+    if (isClosed)
+      throw new IllegalStateException(this + " is closed")
 
-      (for (candlestick <- candlesticks) yield {
-        if (! instruments.contains(candlestick.instrument)) {
-          println("instrument " + Loader.getTableName(candlestick.instrument) + " does not exist in instruments " + instruments);
-          None
-        }
-        else {
-          /*
-          //val stmt = connection.prepareStatement("insert into " + Loader.getTableName(candlestick.instrument) + " (timestamp, bidPrice, askPrice, leverage, initialMargin, maintenanceMargin) VALUES(?, ?, ?, ?, ?, ?));
+    val stmt = connection.prepareStatement("insert into ticks (timestamp, instrumentId, bidPrice, askPrice, leverage, initialMargin, maintenanceMargin) VALUES(?, ?, ?, ?, ?, ?, ?);")
 
-          stmt.setLong(1, candlestick.timestamp);
-          stmt.setDouble(2, candlestick.bidPrice);
-          stmt.setDouble(3, candlestick.askPrice);
-          stmt.setString(4, candlestick.leverage);
-          stmt.setDouble(5, candlestick.initialMargin);
-          stmt.setDouble(6, candlestick.maintenanceMargin);
-          stmt.executeUpdate();
-          */
-          val update = "insert into "+ Loader.getTableName(candlestick.instrument) + "(timestamp, bidPrice, askPrice, leverage, initialMargin, maintenanceMargin) VALUES(" + candlestick.timestamp +", "+ candlestick.bidPrice +", "+ candlestick.askPrice +", '"+candlestick.leverage +"', "+ candlestick.initialMargin +", "+ candlestick.maintenanceMargin +");"
-          executeUpdate(update)
-          Some(candlestick.instrument)
-        }
-      }).flatten
+    def addToBatch(candlestick : CandleStick) : Option[String] = {
+      if (! instruments.contains(candlestick.instrument)) {
+        println("instrument " + candlestick.instrument + " does not exist in instruments " + instruments)
+        None
+      }
+      else if (getId(candlestick.instrument) < 0)
+      {
+        println("Cannot find id for instrument "+ candlestick.instrument +" in "+ idMap)
+        None
+      }
+      else {
+        //println("adding to batch "+ candlestick.instrument)
+        stmt.setLong(1, candlestick.timestamp)
+        stmt.setInt(2, getId(candlestick.instrument))
+        stmt.setDouble(3, candlestick.bidPrice)
+        stmt.setDouble(4, candlestick.askPrice)
+        stmt.setString(5, candlestick.leverage)
+        stmt.setDouble(6, candlestick.initialMargin)
+        stmt.setDouble(7, candlestick.maintenanceMargin)
+        stmt.addBatch()
+        Some(candlestick.instrument)
+      }
     }
 
+    val updatedInstruments : List[String] = candlesticks.flatMap(addToBatch)
+    val batch = stmt.executeBatch()
+    val nFailed = batch.filter(_ != 1).size
+    if (nFailed >0)
+      println(nFailed +" updates failed.")
 
-    //stmt.close();
-    connection.commit();
+    connection.commit()
+
+    //println(batch.mkString(","))
+    stmt.close()
     updatedInstruments
   }
 
@@ -129,13 +149,15 @@ class Loader (private val dbFile: File) {
     connection.close()
   }
 
+  def getId(instrument: String) : Int = idMap.getOrElse(instrument, -1)
+
   override def toString : String = "Loader "+ dbFile.toString
 }
 
 object Loader{
   val TABLE_NAMES_SELECT_STMT = "select * from sqlite_master where type='table';"
-  val CREATE_METADATA_TABLE_STMT = "create table instruments (tableName text not null, instrument text primary key not null, description text not null);"
-
-  def getTableName(instrument: String) = instrument.replaceAll("\\.","_").replaceAll("-","_")
-  def createInstrumentTableStatement(instrument: String) =  "create table "+ getTableName(instrument) +" (timestamp integer primary key, bidPrice double, askPrice double, leverage text, initialMargin double, maintenanceMargin double);";
+  val CREATE_METADATA_TABLE_STMT = "create table instruments (id integer primary key autoincrement, instrument text not null, description text not null);"
+  val CREATE_TICKS_TABLE_STMT =  "create table ticks (timestamp integer not null, instrumentId integer not null, bidPrice double not null, askPrice double not null, leverage text not null, initialMargin double not null, maintenanceMargin double not null);";
 }
+
+case class MetaDataRow(id: Int, symbol: Symbol)

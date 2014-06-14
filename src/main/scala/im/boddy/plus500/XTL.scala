@@ -25,7 +25,7 @@ class XTL(val dbFile: File, val tickLength: Long = 300000, val nThread: Int = 8)
 
     try  {
       val updatedInstruments = loader.updateValues(candlesticks.flatten)
-      println("Updated "+ updatedInstruments.size  +" instruments  @ "+ new Date(System.currentTimeMillis()))
+      println("updated "+ updatedInstruments.size  +" instruments  @ "+ new Date(System.currentTimeMillis()))
     } catch {
       case e : Exception => e.printStackTrace()
     }
@@ -45,8 +45,8 @@ class XTL(val dbFile: File, val tickLength: Long = 300000, val nThread: Int = 8)
 
   class Task(val instrument: String) extends Callable[CandleStick] {
     def call : CandleStick = {
-      val timestamp = System.currentTimeMillis()
       val page = Extractor.getInstrumentPage(instrument)
+      val timestamp = System.currentTimeMillis()
       Transformer.extractCandleStick(page, instrument).copy(timestamp = timestamp)
     }
   }
@@ -63,9 +63,9 @@ class XTL(val dbFile: File, val tickLength: Long = 300000, val nThread: Int = 8)
 
 }
 
-object XTL extends App{
+object XTL {
 
-  def getSymbols(f: File = Paths.get("data", "symbols.txt").toFile) : Seq[Symbol] = Source.fromFile(f).getLines().map(getSymbol).flatten.toSeq
+  def getSymbols(f: File = Paths.get("data", "symbols.txt").toFile) : List[Symbol] = Source.fromFile(f).getLines().map(getSymbol).flatten.toList
 
   private def getSymbol(line: String) : Option[Symbol] = {
     val s : Array[String] = line.split("=")
@@ -74,4 +74,16 @@ object XTL extends App{
     else
       Some(Symbol(s(0).trim, s(1).trim))
   }
+
+  def main(args: Array[String])
+  {
+    if (args.isEmpty)
+      println(usage)
+    else {
+      val xtl = new XTL(new File(args.head))
+      xtl.run()
+    }
+  }
+
+  def usage = "usage: XTL dbFile"
 }
