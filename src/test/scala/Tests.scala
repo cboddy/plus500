@@ -50,8 +50,8 @@ object Tests extends App {
   xtl.xtl
   val duration = System.currentTimeMillis() - start
   println("xtl took "+ duration +" ms.")
-  xtl.close
+  //xtl.close
 
-  //xtl.run
+  xtl.run
 
 }

@@ -14,7 +14,7 @@ clean:
 .PHONY: xtl
 xtl:
 	echo "Manifest-Version: 1.0" > jar.manifest
-	echo "Name: XTL" >> jar.manifest
+	echo "Name: plus500 XTL" >> jar.manifest
 	echo "build-Date: " `date` >> jar.manifest
 	echo "Main-Class: " im.boddy.plus500.XTL >> jar.manifest
 	echo "Class-Path: " lib/*.jar >> jar.manifest
