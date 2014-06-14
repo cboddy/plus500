@@ -15,8 +15,10 @@ ssh amazon '
     cp XTL.tar.gz plus500
     cd plus500
     tar -xvf XTL.tar.gz
-    screen -d -m java -jar XTL.jar plus500.db
+    screen -d -m java -jar XTL.jar plus500.db 
 '
+
+rm XTL.tar XTL.tar.gz
 popd
 
 
