@@ -47,7 +47,7 @@ object Tests extends App {
 
   val xtl = new XTL(dbFile, nThread = 1)
   val start = System.currentTimeMillis()
-  xtl.xtl
+  xtl.xtl()
   val duration = System.currentTimeMillis() - start
   println("xtl took "+ duration +" ms.")
   //xtl.close

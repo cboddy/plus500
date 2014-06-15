@@ -11,36 +11,57 @@ import scala.util.control.Exception._
 /**
  * Created by chris on 6/13/14.
  */
-class XTL(val dbFile: File, val tickLength: Long = 300000, val nThread: Int = 8) extends Runnable {
+class XTL(val dbFile: File, val tickLength: Long = 60000, val nThread: Int = 8) extends Runnable {
 
   val threadPool : ExecutorService  = Executors.newFixedThreadPool(nThread)
   val loader = new Loader(dbFile)
   val symbols = XTL.getSymbols()
   @volatile var isClosed = false
 
-  private [plus500] def xtl = {
+  private def isUpdated(tick: CandleStick, previousTick: Option[CandleStick]) : Boolean = {
+    if (previousTick.isEmpty)
+      true
+    else
+      (! previousTick.get.copy(timestamp=0).equals(tick.copy(timestamp=0)))
+  }
+
+  private [plus500] def xtl(previousTicks : Map[String, CandleStick] = Map()) : Map[String, CandleStick] = {
 
     val futures = symbols.map(_.instrument).map (instrument => threadPool.submit(Task(instrument)))
-    val candlesticks = for (future <- futures) yield allCatch.opt(future.get())
+    val newCandlesticks = futures.map(future => allCatch.opt(future.get())).flatten
+
+    val updatedCandlesticks = newCandlesticks.filter(c => isUpdated(c, previousTicks.get(c.instrument)))
 
     try  {
-      val updatedInstruments = loader.updateValues(candlesticks.flatten)
+      val updatedInstruments = loader.updateValues(updatedCandlesticks)
       println("updated "+ updatedInstruments.size  +" instruments  @ "+ new Date(System.currentTimeMillis()))
     } catch {
       case e : Exception => e.printStackTrace()
     }
+
+    val updatedTicks = updatedCandlesticks.map(c => (c.instrument -> c)).toMap[String, CandleStick]
+    previousTicks ++ updatedTicks
   }
 
   def run {
-    var lastTime  = 0l
+
+    var previousTicks: Map[String, CandleStick] = Map()
+    var counterTime = System.currentTimeMillis()
     while (! isClosed) {
+
       val now = System.currentTimeMillis()
-      val deltaTime = now - lastTime
-      if (deltaTime < tickLength)
-        allCatch(Thread.sleep(tickLength - deltaTime))
-      lastTime = now
-      xtl
+
+      if (now < counterTime)
+        try {
+          Thread.sleep(counterTime - now)
+        } catch { case t :Throwable => }
+
+      counterTime += tickLength
+
+      previousTicks = xtl(previousTicks)
     }
+
+
   }
 
   class Task(val instrument: String) extends Callable[CandleStick] {
