@@ -11,7 +11,7 @@ import scala.util.control.Exception._
 /**
  * Created by chris on 6/13/14.
  */
-class XTL(val dbFile: File, val tickLength: Long = 60000, val nThread: Int = 8) extends Runnable {
+class XTL(val dbFile: File, val tickLength: Long = 300000, val nThread: Int = 8) extends Runnable {
 
   val threadPool : ExecutorService  = Executors.newFixedThreadPool(nThread)
   val loader = new Loader(dbFile)
