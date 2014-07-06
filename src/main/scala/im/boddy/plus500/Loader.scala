@@ -5,6 +5,8 @@ import javax.sql.rowset.CachedRowSet;
 
 import java.io.File;
 import java.sql._
+
+import scala.collection.mutable.ListBuffer
 ;
 
 /**
@@ -87,14 +89,14 @@ class Loader (private val dbFile: File) {
       connection.commit()
   }
 
-  def updateValues(candlesticks : List[CandleStick]) = {
+  def updateValues(candlesticks : List[Candlestick]) = {
 
     if (isClosed)
       throw new IllegalStateException(this + " is closed")
 
     val stmt = connection.prepareStatement("insert into ticks (timestamp, instrumentId, bidPrice, askPrice, leverage, initialMargin, maintenanceMargin) VALUES(?, ?, ?, ?, ?, ?, ?);")
 
-    def addToBatch(candlestick : CandleStick) : Option[String] = {
+    def addToBatch(candlestick : Candlestick) : Option[String] = {
       if (! instruments.contains(candlestick.instrument)) {
         println("instrument " + candlestick.instrument + " does not exist in instruments " + instruments)
         None
@@ -144,6 +146,21 @@ class Loader (private val dbFile: File) {
     cachedRowset
   }
 
+  def getCandleSticks(instrument: String, startTime: Long, endTime: Long) : List[Candlestick] = {
+
+    val id = getId(instrument)
+    if (id < 0)
+      throw new IllegalStateException("Unknown instrument "+ instrument)
+    val query = "select * from ticks where instrumentId = "+ id+ " and timestamp >= "+ startTime + " and timestamp  <= "+ endTime +";"
+    val rs = executeQuery(query);
+
+    val candlesticks = new ListBuffer[Candlestick]();
+    while (rs.next())
+      candlesticks.append(Candlestick(instrument, rs.getDouble("bidPrice"), rs.getDouble("askPrice"), rs.getString("leverage"), rs.getDouble("initialMargin"), rs.getDouble("maintenanceMargin"), rs.getLong("timestamp")))
+
+    candlesticks.toList
+  }
+
   def close {
     isClosed = true
     connection.close()
@@ -154,10 +171,44 @@ class Loader (private val dbFile: File) {
   override def toString : String = "Loader "+ dbFile.toString
 }
 
-object Loader{
+object Loader {
   val TABLE_NAMES_SELECT_STMT = "select * from sqlite_master where type='table';"
   val CREATE_METADATA_TABLE_STMT = "create table instruments (id integer primary key autoincrement, instrument text not null, description text not null);"
   val CREATE_TICKS_TABLE_STMT =  "create table ticks (timestamp integer not null, instrumentId integer not null, bidPrice double not null, askPrice double not null, leverage text not null, initialMargin double not null, maintenanceMargin double not null);";
+
+
+
+  def merge(left: File, right: File, merged: File)
+  {
+    if (merged.isDirectory)
+      throw new IllegalArgumentException("Merged file parameter "+ merged +" must not be a directory")
+    if (merged.exists())
+      merged.delete()
+    if (! merged.createNewFile())
+      throw new IllegalArgumentException("Could not create merged file "+ merged)
+
+    val leftLoader = new Loader(left)
+    val rightLoader = new Loader(right)
+    val mergedLoader = new Loader(merged)
+
+    val instruments = XTL.getSymbols().map(_.instrument)
+
+    for (instrument <- instruments)
+    {
+      val leftTicks = leftLoader.getCandleSticks(instrument, 0, Long.MaxValue)
+      val rightTicks = rightLoader.getCandleSticks(instrument, 0, Long.MaxValue)
+      //select unique ticks
+      val tickSet = (leftTicks ++ rightTicks).toSet
+      if (! tickSet.isEmpty)
+        mergedLoader.updateValues(tickSet.toList)
+    }
+  }
+
+  def main(args: scala.Array[String])
+  {
+    val toFile = (s: String) => new File(s)
+    Loader.merge(toFile(args(0)), toFile(args(1)), toFile(args(2)))
+  }
 }
 
 case class MetaDataRow(id: Int, symbol: Symbol)

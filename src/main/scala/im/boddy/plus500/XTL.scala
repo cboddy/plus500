@@ -18,14 +18,14 @@ class XTL(val dbFile: File, val tickLength: Long = 300000, val nThread: Int = 8)
   val symbols = XTL.getSymbols()
   @volatile var isClosed = false
 
-  private def isUpdated(tick: CandleStick, previousTick: Option[CandleStick]) : Boolean = {
+  private def isUpdated(tick: Candlestick, previousTick: Option[Candlestick]) : Boolean = {
     if (previousTick.isEmpty)
       true
     else
       (! previousTick.get.copy(timestamp=0).equals(tick.copy(timestamp=0)))
   }
 
-  private [plus500] def xtl(previousTicks : Map[String, CandleStick] = Map()) : Map[String, CandleStick] = {
+  private [plus500] def xtl(previousTicks : Map[String, Candlestick] = Map()) : Map[String, Candlestick] = {
 
     val futures = symbols.map(_.instrument).map (instrument => threadPool.submit(Task(instrument)))
     val newCandlesticks = futures.map(future => allCatch.opt(future.get())).flatten
@@ -35,17 +35,21 @@ class XTL(val dbFile: File, val tickLength: Long = 300000, val nThread: Int = 8)
     try  {
       val updatedInstruments = loader.updateValues(updatedCandlesticks)
       println("updated "+ updatedInstruments.size  +" instruments  @ "+ new Date(System.currentTimeMillis()))
+
+      //
+      // updatedCandlesticks.foreach(candlestick => println(candlestick + " " + symbols.filter(_.instrument.equals(candlestick.instrument)).mkString))
+
     } catch {
       case e : Exception => e.printStackTrace()
     }
 
-    val updatedTicks = updatedCandlesticks.map(c => (c.instrument -> c)).toMap[String, CandleStick]
+    val updatedTicks = updatedCandlesticks.map(c => (c.instrument -> c)).toMap[String, Candlestick]
     previousTicks ++ updatedTicks
   }
 
   def run {
 
-    var previousTicks: Map[String, CandleStick] = Map()
+    var previousTicks: Map[String, Candlestick] = Map()
     var counterTime = System.currentTimeMillis()
     while (! isClosed) {
 
@@ -64,8 +68,8 @@ class XTL(val dbFile: File, val tickLength: Long = 300000, val nThread: Int = 8)
 
   }
 
-  class Task(val instrument: String) extends Callable[CandleStick] {
-    def call : CandleStick = {
+  class Task(val instrument: String) extends Callable[Candlestick] {
+    def call : Candlestick = {
       val page = Extractor.getInstrumentPage(instrument)
       val timestamp = System.currentTimeMillis()
       Transformer.extractCandleStick(page, instrument).copy(timestamp = timestamp)
@@ -107,4 +111,7 @@ object XTL {
   }
 
   def usage = "usage: XTL dbFile"
+
+  lazy val symbols : Map[String,String] = getSymbols().map(symbol => symbol.instrument -> symbol.description).toMap
+  def getDescription(instrument : String): Option[String] = symbols.get(instrument)
 }

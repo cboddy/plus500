@@ -40,6 +40,7 @@ object Tests extends App {
   }
 
 
+
   val dbFile = Paths.get("data","test_db.db").toFile
   //dbFile.delete()
   //val loader = new Loader(dbFile)
@@ -50,8 +51,9 @@ object Tests extends App {
   xtl.xtl()
   val duration = System.currentTimeMillis() - start
   println("xtl took "+ duration +" ms.")
-  //xtl.close
+  xtl.close
 
-  xtl.run
+  //xtl.run
+
 
 }

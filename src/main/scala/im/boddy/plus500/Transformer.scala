@@ -16,7 +16,7 @@ object Transformer {
 
   private val factory = new SAXFactoryImpl();
 
-  def extractCandleStick(page: String, instrument: String) : CandleStick = {
+  def extractCandleStick(page: String, instrument: String) : Candlestick = {
     val xml =  XML.withSAXParser(factory.newSAXParser()).loadString(page)
 
     val spans = xml \\ "span"
@@ -49,7 +49,7 @@ object Transformer {
       }
     }
 
-    CandleStick(instrument, bid, ask, leverage, initialMargin, maintenanceMargin)
+    Candlestick(instrument, bid, ask, leverage, initialMargin, maintenanceMargin)
   }
 
   val YesNo = Seq("Yes","No")
@@ -79,5 +79,12 @@ object Transformer {
 
 }
 
-case class CandleStick(instrument: String, bidPrice: Double, askPrice: Double, leverage: String, initialMargin: Double, maintenanceMargin: Double, timestamp: Long = 0)
+case class Candlestick(instrument: String, bidPrice: Double, askPrice: Double, leverage: String, initialMargin: Double, maintenanceMargin: Double, timestamp: Long = 0) {
+
+  implicit object OrderedCandlestick extends Ordering[Candlestick] {
+    def compare(o1: Candlestick, o2: Candlestick) = (o1.timestamp - o2.timestamp).asInstanceOf[Int]
+  }
+  def priceAverage : Double = {(bidPrice + askPrice) / 2.}
+}
+
 case class Symbol(instrument: String, description: String)
