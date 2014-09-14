@@ -1,10 +1,10 @@
-package im.boddy.plus500
+package main.scala.im.boddy.plus500.scraper
 
-import com.sun.rowset.CachedRowSetImpl;
-import javax.sql.rowset.CachedRowSet;
-
-import java.io.File;
+import java.io.File
 import java.sql._
+import javax.sql.rowset.CachedRowSet
+
+import com.sun.rowset.CachedRowSetImpl
 
 import scala.collection.mutable.ListBuffer
 ;

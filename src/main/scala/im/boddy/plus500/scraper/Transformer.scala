@@ -1,7 +1,8 @@
-package im.boddy.plus500
+package main.scala.im.boddy.plus500.scraper
 
-import scala.xml.{XML, Node}
 import org.ccil.cowan.tagsoup.jaxp.SAXFactoryImpl
+
+import scala.xml.{Node, XML}
 
 /**
  * Created by chris on 6/13/14.

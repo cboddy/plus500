@@ -1,9 +1,10 @@
-package im.boddy.plus500
+package main.scala.im.boddy.plus500.scraper
 
 import java.io._
 import java.nio.file.Paths
-import java.util.concurrent.{ExecutorService, Executors, Callable}
 import java.util.Date
+import java.util.concurrent.{Callable, ExecutorService, Executors}
+
 import scala.io.Source
 import scala.util.control.Exception._
 
@@ -25,7 +26,7 @@ class XTL(val dbFile: File, val tickLength: Long = 300000, val nThread: Int = 8)
       (! previousTick.get.copy(timestamp=0).equals(tick.copy(timestamp=0)))
   }
 
-  private [plus500] def xtl(previousTicks : Map[String, Candlestick] = Map()) : Map[String, Candlestick] = {
+  def xtl(previousTicks : Map[String, Candlestick] = Map()) : Map[String, Candlestick] = {
 
     val futures = symbols.map(_.instrument).map (instrument => threadPool.submit(Task(instrument)))
     val newCandlesticks = futures.map(future => allCatch.opt(future.get())).flatten

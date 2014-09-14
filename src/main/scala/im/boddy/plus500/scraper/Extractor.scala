@@ -1,12 +1,7 @@
-package im.boddy.plus500
+package main.scala.im.boddy.plus500.scraper
 
 import java.io.{BufferedReader, InputStreamReader}
 import java.net._
-
-import org.ccil.cowan.tagsoup.jaxp.SAXFactoryImpl
-
-import scala.io.Source
-import scala.xml.{Node, XML}
 
 /**
  * Created by chris on 6/11/14.
