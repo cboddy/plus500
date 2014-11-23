@@ -12,11 +12,11 @@ import io.Source
  */
 object Tests extends App {
 
-  val instrumentTestFile = Paths.get("data","XAU").toFile
+  val instrumentTestFile = Paths.get("data","CL.html").toFile
 
   val instrumentPage = Source.fromFile(instrumentTestFile).mkString
 
-  val candleStick = Transformer.extractCandleStick(instrumentPage, "XAU")
+  val candleStick = Transformer.extractCandleStick(instrumentPage, "CL")
 
   println(candleStick)
 

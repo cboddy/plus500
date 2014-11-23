@@ -32,36 +32,37 @@ object Transformer {
     var expiresDaily = ""
     var maintenanceMargin = 0.0f
     var initialMargin = 0.0f
+    var premium = 0.0
 
     trs.foreach { tr =>
       //leverage
-      if (! ((tr \\ "th"  \\ "span").filter(hasAttribute(_, "id", leverageId)).isEmpty)) {
-        val tds = tr \ "td"
+      val tr_th_spans = tr \\ "th"  \\ "span"
 
+      if (! (tr_th_spans.filter(hasAttribute(_, "id", leverageId)).isEmpty)) {
+        val tds = tr \ "td"
         leverage = tds.filter(_.text.contains(":")).text
         expiresDaily = tds.filter(isYesOrNo).text
       }
 
       //initial, maintenance margin
-      else  if (! ((tr \\ "th"  \\ "span").filter(hasAttribute(_, "id", marginId)).isEmpty)) {
+      else  if (! (tr_th_spans.filter(hasAttribute(_, "id", marginId)).isEmpty)) {
         val tds = tr \ "td"
-
         initialMargin  = tds.map( node => node.text.replace("%","").toFloat).max / 100
         maintenanceMargin  = tds.map( node => node.text.replace("%","").toFloat).min / 100
       }
 
       //premium
-      else if (!  ((tr \\ "th"  \\ "span").filter(hasAttribute(_, "id", premiumId)).isEmpty)) {
+      else if (!  (tr_th_spans.filter(hasAttribute(_, "id", premiumId)).isEmpty)) {
         val tds = tr \ "td"
-
+        premium = tds.map( node => node.text.replace("%","").toDouble).max / 100
       }
 
     }
 
-    Candlestick(instrument, bid, ask, leverage, initialMargin, maintenanceMargin)
+    Candlestick(instrument, bid, ask, leverage, initialMargin, maintenanceMargin, overnightPremium = premium)
   }
 
-  val YesNo = Seq("Yes","No")
+  val YesNo = Set("Yes","No")
   def isYesOrNo(node: Node) : Boolean = {YesNo.contains(node.text)}
 
   def extractSymbols(page: String) : Seq[Symbol] = {
@@ -88,7 +89,7 @@ object Transformer {
 
 }
 
-case class Candlestick(instrument: String, bidPrice: Double, askPrice: Double, leverage: String, initialMargin: Double, maintenanceMargin: Double, timestamp: Long = 0) {
+case class Candlestick(instrument: String, bidPrice: Double, askPrice: Double, leverage: String, initialMargin: Double, maintenanceMargin: Double, timestamp: Long = 0, overnightPremium : Double = 0.0) {
 
   implicit object OrderedCandlestick extends Ordering[Candlestick] {
     def compare(o1: Candlestick, o2: Candlestick) = (o1.timestamp - o2.timestamp).asInstanceOf[Int]

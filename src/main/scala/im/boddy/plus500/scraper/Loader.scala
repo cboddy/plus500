@@ -94,7 +94,7 @@ class Loader (private val dbFile: File) {
     if (isClosed)
       throw new IllegalStateException(this + " is closed")
 
-    val stmt = connection.prepareStatement("insert into ticks (timestamp, instrumentId, bidPrice, askPrice, leverage, initialMargin, maintenanceMargin) VALUES(?, ?, ?, ?, ?, ?, ?);")
+    val stmt = connection.prepareStatement("insert into ticks (timestamp, instrumentId, bidPrice, askPrice, leverage, initialMargin, maintenanceMargin, overnightPremium) VALUES(?, ?, ?, ?, ?, ?, ?, ?);")
 
     def addToBatch(candlestick : Candlestick) : Option[String] = {
       if (! instruments.contains(candlestick.instrument)) {
@@ -115,6 +115,7 @@ class Loader (private val dbFile: File) {
         stmt.setString(5, candlestick.leverage)
         stmt.setDouble(6, candlestick.initialMargin)
         stmt.setDouble(7, candlestick.maintenanceMargin)
+        stmt.setDouble(8, candlestick.overnightPremium)
         stmt.addBatch()
         Some(candlestick.instrument)
       }
@@ -155,8 +156,24 @@ class Loader (private val dbFile: File) {
     val rs = executeQuery(query);
 
     val candlesticks = new ListBuffer[Candlestick]();
-    while (rs.next())
-      candlesticks.append(Candlestick(instrument, rs.getDouble("bidPrice"), rs.getDouble("askPrice"), rs.getString("leverage"), rs.getDouble("initialMargin"), rs.getDouble("maintenanceMargin"), rs.getLong("timestamp")))
+    while (rs.next()) {
+
+      val overnightPremium : Double = try {
+        rs.getDouble("overnightPremium")
+      } catch {
+        case e : Exception => 0.0
+      }
+
+      candlesticks.append(
+        Candlestick(instrument,
+          rs.getDouble("bidPrice"),
+          rs.getDouble("askPrice"),
+          rs.getString("leverage"),
+          rs.getDouble("initialMargin"),
+          rs.getDouble("maintenanceMargin"),
+          rs.getLong("timestamp"),
+          overnightPremium))
+    }
 
     candlesticks.toList
   }
@@ -174,7 +191,7 @@ class Loader (private val dbFile: File) {
 object Loader {
   val TABLE_NAMES_SELECT_STMT = "select * from sqlite_master where type='table';"
   val CREATE_METADATA_TABLE_STMT = "create table instruments (id integer primary key autoincrement, instrument text not null, description text not null);"
-  val CREATE_TICKS_TABLE_STMT =  "create table ticks (timestamp integer not null, instrumentId integer not null, bidPrice double not null, askPrice double not null, leverage text not null, initialMargin double not null, maintenanceMargin double not null);";
+  val CREATE_TICKS_TABLE_STMT =  "create table ticks (timestamp integer not null, instrumentId integer not null, bidPrice double not null, askPrice double not null, leverage text not null, initialMargin double not null, maintenanceMargin double not null, overnightPremium double);";
 
 
 
