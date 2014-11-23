@@ -1,10 +1,8 @@
-package im.boddy.plus500
+package im.boddy.plus500.scraper
 
 import java.io.{BufferedWriter, FileWriter}
 import java.nio.file._
 
-
-import main.scala.im.boddy.plus500.scraper.{XTL, Transformer}
 
 import io.Source
 /**

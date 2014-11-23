@@ -1,4 +1,4 @@
-package main.scala.im.boddy.plus500.scraper
+package im.boddy.plus500.scraper
 
 import java.io._
 import java.nio.file.Paths

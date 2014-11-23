@@ -1,4 +1,4 @@
-package main.scala.im.boddy.plus500.scraper
+package im.boddy.plus500.scraper
 
 import org.ccil.cowan.tagsoup.jaxp.SAXFactoryImpl
 
@@ -16,7 +16,7 @@ object Transformer {
   val marginId = "ctl00_ContentPlaceMain1_LabelInitialMarginHeader"
   val premiumId = "ctl00_ContentPlaceMain1_LabelPremiumBuyHeader"
 
-  private val factory = new SAXFactoryImpl();
+  private val factory = new SAXFactoryImpl()
 
   def extractCandleStick(page: String, instrument: String) : Candlestick = {
     val xml =  XML.withSAXParser(factory.newSAXParser()).loadString(page)
@@ -38,21 +38,21 @@ object Transformer {
       //leverage
       val tr_th_spans = tr \\ "th"  \\ "span"
 
-      if (! (tr_th_spans.filter(hasAttribute(_, "id", leverageId)).isEmpty)) {
+      if (tr_th_spans.filter(hasAttribute(_, "id", leverageId)).nonEmpty) {
         val tds = tr \ "td"
         leverage = tds.filter(_.text.contains(":")).text
         expiresDaily = tds.filter(isYesOrNo).text
       }
 
       //initial, maintenance margin
-      else  if (! (tr_th_spans.filter(hasAttribute(_, "id", marginId)).isEmpty)) {
+      else  if (tr_th_spans.filter(hasAttribute(_, "id", marginId)).nonEmpty) {
         val tds = tr \ "td"
         initialMargin  = tds.map( node => node.text.replace("%","").toFloat).max / 100
         maintenanceMargin  = tds.map( node => node.text.replace("%","").toFloat).min / 100
       }
 
       //premium
-      else if (!  (tr_th_spans.filter(hasAttribute(_, "id", premiumId)).isEmpty)) {
+      else if (tr_th_spans.filter(hasAttribute(_, "id", premiumId)).nonEmpty) {
         val tds = tr \ "td"
         premium = tds.map( node => node.text.replace("%","").toDouble).max / 100
       }
@@ -94,7 +94,7 @@ case class Candlestick(instrument: String, bidPrice: Double, askPrice: Double, l
   implicit object OrderedCandlestick extends Ordering[Candlestick] {
     def compare(o1: Candlestick, o2: Candlestick) = (o1.timestamp - o2.timestamp).asInstanceOf[Int]
   }
-  def priceAverage : Double = {(bidPrice + askPrice) / 2.}
+  def priceAverage : Double = {(bidPrice + askPrice) / 2.0}
 }
 
 case class Symbol(instrument: String, description: String)

@@ -1,4 +1,4 @@
-package main.scala.im.boddy.plus500.scraper
+package im.boddy.plus500.scraper
 
 import java.io.File
 import java.sql._
@@ -28,7 +28,7 @@ class Loader (private val dbFile: File) {
   private val symbols : List[Symbol] = XTL.getSymbols()
   private val instruments : Set[String] = symbols.map(_.instrument).toSet
   private val rows = init
-  private val idMap : Map[String, Int] = rows.map(row => (row.symbol.instrument -> row.id)).toMap
+  private val idMap : Map[String, Int] = rows.map(row => row.symbol.instrument -> row.id).toMap
 
   @volatile var isClosed = false
 
@@ -66,8 +66,8 @@ class Loader (private val dbFile: File) {
         executeUpdate(insert)
       }
 
-    presentMetadataRows.clear
-    val rsss = executeQuery("select * from instruments");
+    presentMetadataRows.clear()
+    val rsss = executeQuery("select * from instruments")
     while (rsss.next())
     {
       val id = rsss.getInt("id");
