@@ -14,6 +14,7 @@ object Transformer {
   val askId = "ctl00_ContentPlaceMain1_LabelSellPrice"
   val leverageId = "ctl00_ContentPlaceMain1_LabelLeverageHeader"
   val marginId = "ctl00_ContentPlaceMain1_LabelInitialMarginHeader"
+  val premiumId = "ctl00_ContentPlaceMain1_LabelPremiumBuyHeader"
 
   private val factory = new SAXFactoryImpl();
 
@@ -48,6 +49,13 @@ object Transformer {
         initialMargin  = tds.map( node => node.text.replace("%","").toFloat).max / 100
         maintenanceMargin  = tds.map( node => node.text.replace("%","").toFloat).min / 100
       }
+
+      //premium
+      else if (!  ((tr \\ "th"  \\ "span").filter(hasAttribute(_, "id", premiumId)).isEmpty)) {
+        val tds = tr \ "td"
+
+      }
+
     }
 
     Candlestick(instrument, bid, ask, leverage, initialMargin, maintenanceMargin)
